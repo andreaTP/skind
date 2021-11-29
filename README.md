@@ -9,7 +9,7 @@ skind just makes easier and straightforward to deploy kind clusters.
 ## Installation
 Download the script and place it in your PATH
 ```
-curl https://raw.githubusercontent.com/famartinrh/skind/master/skind --output /usr/local/bin/skind && chmod +x /usr/local/bin/skind
+curl https://raw.githubusercontent.com/famartinrh/skind/master/skind --output $HOME/bin/skind && chmod +x $HOME/bin/skind
 ```
 
 ## Usage
