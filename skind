@@ -1,0 +1,129 @@
+#!/bin/bash
+set -e
+
+KIND_CLUSTER_NAME=skind-cluster
+reg_name='kind-registry'
+reg_port='5000'
+
+cli_help() {
+  cli_name=${0##*/}
+  echo "
+skind [Simple Kubernetes In Docker]
+Version: 0.0.1
+https://github.com/famartinrh/skind
+Usage: $cli_name [command]
+Commands:
+  start    Starts an opinionated Kind cluster
+  stop     Stops the Kind cluster
+  status   Prints information about the current running cluster
+  *        Help
+"
+  exit 1
+}
+
+start() {
+  echo "Starting..."
+
+  if [ $(kind get clusters | grep ${KIND_CLUSTER_NAME} | wc -l) = 1 ]
+  then
+    echo "Cluster already exists"
+  else
+
+    # create registry container unless it already exists
+    running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
+    if [ "${running}" != 'true' ]; then
+      echo "Creating image registry"
+      docker run -d --restart=always -p "${reg_port}:5000" --name "${reg_name}" registry:2
+    fi
+
+    echo "Creating Cluster..."
+
+    # create a cluster with the local registry enabled in containerd
+    tmpkindconfig=$(mktemp /tmp/tmpkindconfig.XXXXXX)
+    echo "
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+containerdConfigPatches:
+- |-
+  [plugins.\"io.containerd.grpc.v1.cri\".registry.mirrors.\"localhost:5000\"]
+    endpoint = [\"http://kind-registry:5000\"]
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: \"ingress-ready=true\"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+- role: worker" >> $tmpkindconfig
+
+    echo "using kind config"
+    cat $tmpkindconfig
+
+    kind create cluster --name ${KIND_CLUSTER_NAME} --image=kindest/node:v1.19.0 --config=$tmpkindconfig
+    rm "$tmpkindconfig"
+
+    # connect the registry to the cluster network
+    docker network connect "kind" "${reg_name}" || true
+
+    # tell https://tilt.dev to use the registry
+    # https://docs.tilt.dev/choosing_clusters.html#discovering-the-registry
+    for node in $(kind get nodes --name $KIND_CLUSTER_NAME); do
+      kubectl annotate node "${node}" "kind.x-k8s.io/registry=localhost:${reg_port}";
+    done
+
+    # setup ingress
+    # using nginx ingress version v0.46.0
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.46.0/deploy/static/provider/kind/deploy.yaml
+    kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-ssl-passthrough"}]'
+    kubectl rollout status -n ingress-nginx deployment/ingress-nginx-controller
+
+    echo "skind cluster started"
+  fi
+}
+
+stop() {
+  echo "Stopping..."
+  kind delete cluster --name $KIND_CLUSTER_NAME
+
+  running="$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)"
+  if [ "${running}" == 'true' ]; then
+    echo "Deleting image registry"
+    containerID="$(docker inspect -f '{{.Id}}' "${reg_name}" )"
+    docker stop "${containerID}"
+    docker rm "${containerID}"
+  fi
+}
+
+status() {
+  if [ $(kind get clusters | grep ${KIND_CLUSTER_NAME} | wc -l) = 1 ]
+  then
+    echo "Cluster is running"
+    kubectl version
+    kubectl get namespaces
+  else
+    echo "Cluster is not running"
+  fi
+}
+
+case "$1" in
+  start|d)
+    start
+    ;;
+  stop|d)
+    stop
+    ;;
+  status)
+    status
+    ;;
+  *)
+    cli_help
+    ;;
+esac
