@@ -114,10 +114,10 @@ status() {
 }
 
 case "$1" in
-  start|d)
+  start)
     start
     ;;
-  stop|d)
+  stop)
     stop
     ;;
   status)
