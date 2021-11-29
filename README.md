@@ -11,6 +11,12 @@ Download the script and place it in your PATH
 ```
 curl https://raw.githubusercontent.com/famartinrh/skind/master/skind --output $HOME/bin/skind && chmod +x $HOME/bin/skind
 ```
+or
+```
+sudo curl https://raw.githubusercontent.com/famartinrh/skind/master/skind --output skind
+sudo chmod +x skind
+sudo mv skind /usr/local/bin/skind
+```
 
 ## Usage
 ```
