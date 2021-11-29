@@ -4,7 +4,7 @@ skind is a simple CLI tool built on top of [kind](https://kind.sigs.k8s.io/)
 
 kind is allows to provision local kubernetes clusters useful for testing purposes.
 
-skind just makes easier and straightforward to deploy kind clusters.
+skind just makes easier and straightforward to deploy kind clusters. This tool provides a simple CLI for provisioning opinionated kind clusters. This tool deploys a local image registry and configures nginx ingress.
 
 ## Installation
 Download the script and place it in your PATH
