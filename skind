@@ -16,6 +16,7 @@ Commands:
   start    Starts an opinionated Kind cluster
   stop     Stops the Kind cluster
   status   Prints information about the current running cluster
+  expose   Create Ingress for exposing a Service
   *        Help
 "
   exit 1
@@ -113,6 +114,51 @@ status() {
   fi
 }
 
+expose() {
+  svcname=$1
+
+  if [ "$svcname" == "" ]; then
+    echo "missing service name as first argument"
+    exit 1
+  fi
+
+  svcport=$(kubectl get service $svcname -o=jsonpath={.spec.ports[0].port})
+
+  if [ "$svcport" == "" ]; then
+    echo "error getting service port from kubernetes, does the service $svcname exists?"
+    exit 1
+  fi
+
+  echo "Creating ingress for service $svcname using port $svcport in current namespace"
+
+  tmpingressconfig=$(mktemp /tmp/tmpingressconfig.XXXXXX)
+  echo "
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: $svcname-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+    - host: $svcname.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: $svcname
+                port:
+                  number: $svcport" >> $tmpingressconfig
+
+  cat $tmpingressconfig
+
+  kubectl apply -f $tmpingressconfig
+  rm $tmpingressconfig
+
+}
+
 case "$1" in
   start)
     start
@@ -122,6 +168,9 @@ case "$1" in
     ;;
   status)
     status
+    ;;
+  expose)
+    expose $2
     ;;
   *)
     cli_help

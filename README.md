@@ -30,6 +30,7 @@ Commands:
   start    Starts an opinionated Kind cluster
   stop     Stops the Kind cluster
   status   Prints information about the current running cluster
+  expose   Create Ingress for exposing a Service
   *        Help
 
 $ skind start
@@ -37,5 +38,9 @@ $ skind start
 $ skind status
 ...
 $ skind stop
+...
+$ skind expose my-service
+...
+Creating ingress for service my-service using port 8080 in current namespace
 ...
 ```
