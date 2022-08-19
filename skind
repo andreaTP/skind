@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 KIND_CLUSTER_NAME=skind-cluster
 reg_name='kind-registry'
@@ -68,7 +68,7 @@ nodes:
     echo "using kind config"
     cat $tmpkindconfig
 
-    kind create cluster --name ${KIND_CLUSTER_NAME} --image=kindest/node:v1.19.0 --config=$tmpkindconfig
+    kind create cluster --name ${KIND_CLUSTER_NAME} --config=$tmpkindconfig
     rm "$tmpkindconfig"
 
     # connect the registry to the cluster network
@@ -81,8 +81,8 @@ nodes:
     done
 
     # setup ingress
-    # using nginx ingress version v0.46.0
-    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v0.46.0/deploy/static/provider/kind/deploy.yaml
+    # using nginx ingress
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
     kubectl patch deployment ingress-nginx-controller -n ingress-nginx --type=json -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--enable-ssl-passthrough"}]'
     kubectl rollout status -n ingress-nginx deployment/ingress-nginx-controller
 
